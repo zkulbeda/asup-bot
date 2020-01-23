@@ -11,7 +11,6 @@ export let command_list = "Список доступных команд:\n" +
     "/setting - открыть настройки\n" +
     "/contact - получить контакты школы\n" +
     "/help - получить список команд\n";
-
 export let messages = {
     hello_message: {
         vk: [
