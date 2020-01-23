@@ -4,15 +4,55 @@
   "main": "main.js",
   "license": "MIT",
   "dependencies": {
+    "@babel/cli": "^7.0.0",
     "@google-cloud/firestore": "^2.4.0",
     "@google-cloud/functions-framework": "^1.3.2",
+    "@vk-io/scenes": "^0.0.0-alpha.5",
+    "@vk-io/session": "^0.0.0-alpha.3",
+    "async-middleware": "^1.2.1",
+    "axios": "^0.19.0",
     "body-parser": "^1.19.0",
+    "cjs-to-es6": "^1.1.1",
+    "concurrently": "^5.0.2",
+    "dot": "^1.1.3",
     "express": "^4.17.1",
     "firebase-admin": "^8.6.0",
+    "global": "^4.4.0",
+    "localtunnel": "^2.0.0",
+    "lodash": "^4.17.15",
+    "luxon": "^1.21.3",
+    "modofun": "^1.2.2",
+    "ngrok": "^3.2.7",
+    "node-watch": "^0.6.3",
+    "nodemon": "^2.0.2",
+    "nodemon-webpack-plugin": "^4.2.2",
+    "nunjucks": "^3.2.0",
+    "pnp-webpack-plugin": "^1.5.0",
+    "serverless-webpack": "^5.3.1",
     "telegraf": "^3.32.0",
-    "telegraf-inline-menu": "^3.6.3"
+    "telegraf-command-parts": "^1.0.3",
+    "telegraf-inline-menu": "^3.6.3",
+    "vk-io": "^4.0.0-rc.30",
+    "webpack": "^4.41.5",
+    "webpack-node-externals": "^1.7.2"
   },
   "scripts": {
-    "start": "functions-framework --target=webhook"
+    "start": "functions-framework --target=webhook",
+    "dev": "concurrently \"npm:express\" \"npm:tunnel\"",
+    "2tunnel": "node compiled/ngrok.js",
+    "tunnel": "webpack ngrok.js --config webpack.config.js --watch --output-filename tunnel.js",
+    "express": "webpack --config webpack.config.js --watch"
+  },
+  "devDependencies": {
+    "@babel/cli": "^7.7.7",
+    "@babel/core": "^7.7.7",
+    "@babel/plugin-transform-runtime": "^7.7.6",
+    "@babel/polyfill": "^7.7.0",
+    "@babel/preset-env": "^7.7.7",
+    "babel-loader": "^8.0.6",
+    "json-loader": "^0.5.7",
+    "ts-loader": "^6.2.1",
+    "typescript": "^3.7.4",
+    "webpack-cli": "^3.3.10"
   }
 }

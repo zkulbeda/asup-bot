@@ -1,186 +1,132 @@
-let telegraf = require('telegraf')
-const session = require('./telegraf-session-firestore')
-const Stage = require('telegraf/stage')
-const Scene = require('telegraf/scenes/base')
-const Extra = require('telegraf/extra')
-const Markup = require('telegraf/markup')
-const { leave, enter } = Stage
-const TelegrafInlineMenu = require('telegraf-inline-menu')
-const admin = require('firebase-admin');
-const firestore = require("@google-cloud/firestore");
-
-let db = new firestore({
-	// projectId: "telegrambot-255720",
-	keyFilename: './telegrambot-255720-fc32c10a28bc.json'
+import Stage from 'telegraf/stage';
+import Extra from 'telegraf/extra';
+import Markup from 'telegraf/markup';
+const {leave, enter} = Stage;
+import standard_use from "./standard_use";
+import {db, getStudent, getCompileFunction, getStudentMenu, question_keyboard} from "./common"
+import bot from './tg_instance';
+bot.catch(async (e)=>{
+    console.log(e.toString());
+    console.error(e);
 });
-db.collection('asf').doc('dfg').set({sdv:12,fe:true}).catch((e)=>{throw e;});
+const render = getCompileFunction("tg");
 
-const menu = new TelegrafInlineMenu('Main Menu')
+standard_use(bot);
 
-menu.urlButton('EdJoPaTo.de', 'https://edjopato.de')
-
-let mainMenuToggle = false
-menu.toggle('toggle me', 'a', {
-  setFunc: (_ctx, newVal) => {
-    mainMenuToggle = newVal
-  },
-  isSetFunc: () => mainMenuToggle
-})
-
-menu.simpleButton('click me', 'c', {
-  doFunc: async ctx => ctx.answerCbQuery('you clicked me!'),
-  hide: () => mainMenuToggle
-})
-
-menu.simpleButton('click me harder', 'd', {
-  doFunc: async ctx => ctx.answerCbQuery('you can do better!'),
-  joinLastRow: true,
-  hide: () => mainMenuToggle
-})
-
-let selectedKey = 'b'
-menu.select('s', ['A', 'B', 'C'], {
-  setFunc: async (ctx, key) => {
-    selectedKey = key
-    await ctx.answerCbQuery(`you selected ${key}`)
-  },
-  isSetFunc: (_ctx, key) => key === selectedKey
-})
-
-const foodMenu = new TelegrafInlineMenu('People like food. What do they like?')
-
-const people = {Mark: {}, Paul: {}}
-const food = ['bread', 'cake', 'bananas']
-
-function personButtonText(_ctx, key) {
-  const entry = people[key]
-  if (entry && entry.food) {
-    return `${key} (${entry.food})`
-  }
-
-  return key
-}
-
-function foodSelectText(ctx) {
-  const person = ctx.match[1]
-  const hisChoice = people[person].food
-  if (!hisChoice) {
-    return `${person} is still unsure what to eat.`
-  }
-
-  return `${person} likes ${hisChoice} currently.`
-}
-
-const foodSelectSubmenu = new TelegrafInlineMenu(foodSelectText)
-  .toggle('Prefer Tee', 't', {
-    setFunc: (ctx, choice) => {
-      const person = ctx.match[1]
-      people[person].tee = choice
-    },
-    isSetFunc: ctx => {
-      const person = ctx.match[1]
-      return people[person].tee === true
+let check_late_state = async (ctx)=>{
+    if(!ctx.state.settings.is_poll_active) {
+        if (ctx.state.student.answer === null) {
+            return await ctx.replyWithMarkdown(render("sorry_you_re_late", {notified: ctx.state.student.send_questions}),
+                Extra.markup(Markup.inlineKeyboard([
+                    Markup.callbackButton(render('i_will_eat_anyway_button'), "i_want_eat")
+                ])))
+        }else{
+            return await ctx.replyWithMarkdown(render('sorry_timeout'),
+                (!ctx.state.student.answer?Extra.markup(Markup.inlineKeyboard([
+                    Markup.callbackButton(render('i_will_eat_anyway_button'), "i_want_eat")
+                ])):undefined));
+        }
     }
-  })
-  .select('f', food, {
-    setFunc: (ctx, key) => {
-      const person = ctx.match[1]
-      people[person].food = key
-    },
-    isSetFunc: (ctx, key) => {
-      const person = ctx.match[1]
-      return people[person].food === key
-    }
-  })
+    return false;
+};
 
-foodMenu.selectSubmenu('p', () => Object.keys(people), foodSelectSubmenu, {
-  textFunc: personButtonText,
-  columns: 2
-})
-
-foodMenu.question('Add person', 'add', {
-  questionText: 'Who likes food too?',
-  setFunc: (_ctx, key) => {
-    people[key] = {}
-  }
-})
-
-menu.submenu('Food menu', 'food', foodMenu, {
-  hide: () => mainMenuToggle
-})
-
-let isAndroid = true
-menu.submenu('Photo Menu', 'photo', new TelegrafInlineMenu('', {
-  photo: () => isAndroid ? 'https://telegram.org/img/SiteAndroid.jpg' : 'https://telegram.org/img/SiteiOs.jpg'
-}))
-  .setCommand('photo')
-  .simpleButton('Just a button', 'a', {
-    doFunc: async ctx => ctx.answerCbQuery('Just a callback query answer')
-  })
-  .select('img', ['iOS', 'Android'], {
-    isSetFunc: (_ctx, key) => key === 'Android' ? isAndroid : !isAndroid,
-    setFunc: (_ctx, key) => {
-      isAndroid = key === 'Android'
-    }
-  })
-
-menu.setCommand('m')
-
-// Greeter scene
-const greeterScene = new Scene('greeter')
-greeterScene.enter((ctx) => ctx.reply('Hi'))
-greeterScene.leave((ctx) => ctx.reply('Bye'))
-greeterScene.hears('hi', enter('echo'))
-greeterScene.on('message', (ctx) => ctx.replyWithMarkdown('Send `hi`', Extra.markup((m) =>
-    m.inlineKeyboard([
-      m.callbackButton('Coke', 'Coke'),
-      m.callbackButton('Pepsi', 'Pepsi')
-    ]))))
-greeterScene.on('callback_query', (ctx)=>{
-	console.log(ctx)
-	ctx.answerCbQuery("CALLBACK: "+ctx.update.callback_query.data, true)
+bot.command('start', async (ctx)=>{
+    let student = await getStudent(ctx);
+    if(student===null)
+        await ctx.replyWithMarkdown("Привет, отправь свой код приглашения, чтобы я знал, кто ты.");
+    let st_data = student.data(); //TODO Выделить это в отдельный middleware
+    await ctx.reply("Привет, "+st_data.name.first_name+", я буду присылать тебе сообщения с вопросом," +
+        " будешь ли ты кушать, каждый день. Если у тебя возникнут сложности, подойти к своему классному руководителю.");
 });
-
-// Echo scene
-const echoScene = new Scene('echo')
-echoScene.enter((ctx) => ctx.reply('echo scene'))
-echoScene.leave((ctx) => ctx.reply('exiting echo scene'))
-echoScene.command('back', leave())
-echoScene.on('text', (ctx) => ctx.reply(ctx.message.text))
-echoScene.on('message', (ctx) => ctx.reply('Only text messages please'))
-
-// Create scene manager
-const stage = new Stage([greeterScene,echoScene])
-stage.command('cancel', leave())
-
-// Scene registration
-
-let bot = new telegraf(process.env.botapi,{
-  telegram: { 
-    webhookReply: true
-  },
+bot.action('i_did_not_eat', (ctx)=>{
+    return ctx.editMessageText(render("but_i_did_not_eat_today"), Extra.markdown())
 });
-
-bot.use(telegraf.log())
-
-bot.use(session({store: db}))
-bot.use(stage.middleware())
-bot.use(menu.init({backButtonText: 'Назад'}))
-// bot.on('message', (ctx) => {
-//   console.log(ctx)
-// })
-// bot.hears('hi', ctx => ctx.reply('Hey there!'))
+bot.action("i_want_eat", async (ctx)=>{
+    await ctx.state.student.update({
+        late_day_stamp: ctx.state.local_day_stamp
+    });
+    await ctx.editMessageText(render("i_will_eat_anyway_text"), Extra.markdown());
+});
+bot.action(/^selected_(yes|no)$/, async (ctx)=>{
+    if(ctx.callbackQuery.message.message_id !== ctx.state.student.last_message_id){
+        return ctx.editMessageText('Сообщение больше не действительно.');
+    }
+    if(!ctx.state.settings.is_poll_active){
+        if(ctx.state.student.answer === null){
+            return await ctx.editMessageText(render("sorry_you_re_late"), Extra.markup((e) => e.inlineKeyboard([
+                e.callbackButton(render("i_will_eat_anyway_button"), "i_want_eat")
+            ])).markdown())
+        }
+        else return ctx.editMessageText(render("stopped_poll_question", {will_eat: ctx.state.student.answer, menu: getStudentMenu(ctx)}),
+            Extra.markdown());
+    }
+    let yes_answer = ctx.match[1]==="yes";
+    await ctx.state.student.update({
+        answer: yes_answer
+    });
+    await ctx.editMessageText(render("edited_question", {will_eat: yes_answer, menu: getStudentMenu(ctx)}),
+        question_keyboard(yes_answer));
+    await ctx.answerCbQuery("", false)
+});
+bot.help((ctx)=>{
+    return ctx.replyWithMarkdown(hello_message+"\n\n"+command_list);
+});
+bot.command('setting', enter('settings'));
+bot.action("none", async (ctx)=>{
+    await ctx.answerCbQuery("", false);
+});
+bot.on('callback_query', (ctx)=>{
+    return ctx.answerCbQuery("Я не знаю, что делать с этой кнопкой");
+});
+bot.on("edited_message", (ctx)=>{
+    return ctx.reply("Извини, я не умею обрабатывать отредактированные сообщения");
+});
+bot.hears(/^(?:Да)?(?:, )?(?:сегодня )?(?:Я )?(?:сегодня )?(?:хочу |буду )?(?:сегодня )?(?:я )?((?:кушать|кушаю)|(?:питаться|питаюсь)|(?:есть|ем))(?: сегодня)?$/i,
+    async (ctx)=>{
+        let is_days_same = ctx.state.settings.day_stamp === ctx.state.local_day_stamp;
+        if(is_days_same && await check_late_state(ctx)) return;
+        if(ctx.state.student.answer === true){
+            return ctx.replyWithMarkdown(render("you_already_will_eat_today"))
+        }
+        await ctx.state.student.update({
+            answer: true,
+            answer_day_stamp: ctx.state.local_day_stamp
+        });
+        if(ctx.state.student.message_send_day_stamp === ctx.state.local_day_stamp)
+            await bot.telegram.editMessageText(ctx.state.student.user_id, ctx.state.student.last_message_id, null,
+                render("edited_question", {menu: getStudentMenu(ctx), will_eat: true}), question_keyboard(true));
+        await ctx.replyWithMarkdown(render("ok_you_will_eat_today"+
+            (!is_days_same?"_but_poll_isnt_active":'')));
+    });
+bot.hears(/^(?:Нет)?(?:, )?(?:(?<!не )сегодня )?(?:Я )?(?:(?<!не )сегодня )?(не )(?:хочу |буду )?(?:(?<!не )сегодня )?(?:я )?((?:кушать|кушаю)|(?:питаться|питаюсь)|(?:есть|ем))(?: сегодня)?$/i,
+    async (ctx)=>{
+        let is_days_same = ctx.state.settings.day_stamp === ctx.state.local_day_stamp;
+        if(is_days_same && await check_late_state(ctx)) return;
+        if(ctx.state.student.answer === false){
+            return await ctx.replyWithMarkdown(render("you_already_will_not_eat_today"))
+        }
+        await ctx.state.student.update({
+            answer: false,
+            answer_day_stamp: ctx.state.local_day_stamp
+        });
+        if(ctx.state.student.message_send_day_stamp === ctx.state.local_day_stamp)
+            await bot.telegram.editMessageText(ctx.state.student.user_id, ctx.state.student.last_message_id, null,
+                render("edited_question", {menu: getStudentMenu(ctx), will_eat: false}), question_keyboard(false));
+        await ctx.replyWithMarkdown(render("ok_you_will_not_eat_today"+
+            (!is_days_same?"_but_poll_isnt_active":'')));
+    });
 
 bot.catch((err) => {
-  console.log('Ooops', err)
-})
-bot.command('greeter', (ctx) => ctx.scene.enter('greeter'))
-bot.command('echo', enter('echo'))
-bot.command('fater', (ctx) => ctx.reply('sdfgvsfdg\nawsgfd\n'))
-bot.on('text', (ctx) => {
-  return ctx.reply(`${ctx.message.from.username}: ${ctx.message.text}`)
-})
+    console.log('Ooops', err)
+});
 
+bot.on('text',(ctx) => {
+    return ctx.reply(render('i_dont_understand'));
+    //return ctx.reply(`${ctx.message.from.username}: ${ctx.message.text}`)
+});
+bot.on("message", (ctx)=>{
+    return ctx.reply(render("i_dont_understand_media"));
+});
 /**
  * HTTP Cloud Function.
  *
@@ -189,6 +135,7 @@ bot.on('text', (ctx) => {
  * @param {Object} res Cloud Function response context.
  *                     More info: https://expressjs.com/en/api.html#res
  */
-exports.mainBot = (req, res) => {
-  bot.handleUpdate(req.body, res);
+export let mainBot = async (req, res) => {
+    await bot.handleUpdate(req.body);
+    return res.send("ok").end();
 };
