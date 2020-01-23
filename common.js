@@ -1,5 +1,5 @@
 import firestore from "@google-cloud/firestore";
-import cloud_key from './key.json'
+import cloud_key from './bot_credentials.json'
 
 export let db = new firestore({
     credentials: cloud_key
