@@ -12,7 +12,7 @@ provider:
   # https://serverless.com/framework/docs/providers/google/guide/credentials/
   #
   # the path to the credentials file needs to be absolute
-  credentials: C:\Users\STEM 10\PhpstormProjects\telegraf-homework\telegrambot-255720-e48c84943b78.json
+  credentials: C:\Users\STEM 10\PhpstormProjects\telegraf-homework\key.json
 
 plugins:
   - serverless-google-cloudfunctions
